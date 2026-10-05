@@ -115,6 +115,7 @@ public class RecordDetail implements AbstractRecordX<FieldDetail>, ICsvDefinitio
 	private static final byte UNDEFINED = -121;
 	private static final byte NO = 1;
 	private static final byte YES = 2;
+	private boolean useFixedStructureSizes = false;
 
 	/**
 	 * This is the default stratergy to use when there is no Occurs-Depending
@@ -507,6 +508,31 @@ public class RecordDetail implements AbstractRecordX<FieldDetail>, ICsvDefinitio
 	 */
 	public final int getMinumumPossibleLength() {
 		return minumumPossibleLength;
+	}
+
+
+	/**
+	 * @return whether this record uses fixed size structures
+	 */
+	public final boolean isUseFixedStructureSizes() {
+		return useFixedStructureSizes;
+	}
+
+
+	/**
+	 * Set whether this record uses <i>fixed size structures</i>. When
+	 * <code>true</code>, the fields have fixed positions that are <b>not</b>
+	 * affected by <i>occurs depending on</i> clauses; i.e. the record layout is
+	 * treated as if every field position is fixed.
+	 *
+	 * @param useFixedStructureSizes whether to use fixed structure sizes
+	 */
+	public final void setUseFixedStructureSizes(boolean useFixedStructureSizes) {
+		this.useFixedStructureSizes = useFixedStructureSizes;
+		if (useFixedStructureSizes) {
+			odCalculator = DEFAULT_POSITION_CALCULATOR;
+			minumumPossibleLength = length;
+		}
 	}
 
 
@@ -1355,15 +1381,20 @@ public class RecordDetail implements AbstractRecordX<FieldDetail>, ICsvDefinitio
 		}
 
 		dependingOnDef.buildSizeFieldMap();
-		switch (dependingOnLevel) {
-		case DO_NONE: odCalculator = DEFAULT_POSITION_CALCULATOR;		break;
-		case DO_COMPLEX_SIZE_IN_ARRAY:
-			odCalculator = new ODCalculationComplex(dependingOnDef);
-			break;
-		default:
-			odCalculator = new ODCalculationStandard(dependingOnDef);
+
+		if (!useFixedStructureSizes) {
+			switch (dependingOnLevel) {
+				case DO_NONE:
+					odCalculator = DEFAULT_POSITION_CALCULATOR;
+					break;
+				case DO_COMPLEX_SIZE_IN_ARRAY:
+					odCalculator = new ODCalculationComplex(dependingOnDef);
+					break;
+				default:
+					odCalculator = new ODCalculationStandard(dependingOnDef);
+			}
+			minumumPossibleLength = length - len;
 		}
-		minumumPossibleLength = length - len;
 	}
 	
 	/**

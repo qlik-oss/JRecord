@@ -35,6 +35,9 @@
       
 package net.sf.JRecord.Common;
 
+import net.sf.converters.CvtConversions;
+import net.sf.converters.CvtException;
+
 import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
@@ -1155,6 +1158,41 @@ public final class Conversion {
     		}
     	}
     }
+
+	/**
+	 * Convert an IBM HFP value to IEEE (big-endian output). On a CVT condition
+	 * the well-defined output bytes the converter produced are used, mirroring
+	 * the reference implementation's behaviour.
+	 */
+	public static byte[] convertHFPBytesToIEEE(boolean shortFloat, byte[] ibm) {
+		try {
+			return shortFloat
+					? CvtConversions.ibmShortToIeeeSingle(ibm, CvtConversions.CVT_C_BIG_ENDIAN)
+					: CvtConversions.ibmLongToIeeeDouble(ibm, CvtConversions.CVT_C_BIG_ENDIAN);
+		} catch (CvtException e) {
+			if (e.getOutputValue() != null) {
+				return e.getOutputValue();
+			}
+			throw e;
+		}
+	}
+
+	/**
+	 * Convert an IEEE value (big-endian input) to IBM HFP. On a CVT condition
+	 * the well-defined output bytes the converter produced are used.
+	 */
+	public static byte[] convertIEEEBytesToHFP(boolean shortFloat, byte[] ieee) {
+		try {
+			return shortFloat
+					? CvtConversions.ieeeSingleToIbmShort(ieee, CvtConversions.CVT_C_BIG_ENDIAN)
+					: CvtConversions.ieeeDoubleToIbmLong(ieee, CvtConversions.CVT_C_BIG_ENDIAN);
+		} catch (CvtException e) {
+			if (e.getOutputValue() != null) {
+				return e.getOutputValue();
+			}
+			throw e;
+		}
+	}
     
     
 //    /**
@@ -1192,6 +1230,39 @@ public final class Conversion {
 		return negative0EbcdicZoned;
 	}
 
+	public static long toBigEndian(byte[] b, int len) {
+		long v = 0;
+		for (int i = 0; i < len; i++) {
+			v = (v << 8) | (b[i] & 0xFFL);
+		}
+		return v;
+	}
+
+	public static byte[] fromBigEndian(long value, int len) {
+		byte[] b = new byte[len];
+		for (int i = 0; i < len; i++) {
+			b[i] = (byte) ((value >> (8 * (len - 1 - i))) & 0xFF);
+		}
+		return b;
+	}
+
+	public static float IBMHfpBytesToFloat(byte[] bytes) {
+		byte[] ieee = convertHFPBytesToIEEE(true, bytes);
+		return Float.intBitsToFloat((int)toBigEndian(ieee, 4));
+	}
+	public static byte[] IEEEFloatToIbmHfpBytes(float f) {
+		int intVal = Float.floatToRawIntBits(f);
+		return convertIEEEBytesToHFP(true, fromBigEndian(intVal, 4));
+	}
+
+	public static double IBMHfpBytesToDouble(byte[] bytes) {
+		byte[] ieee = convertHFPBytesToIEEE(false, bytes);
+		return Double.longBitsToDouble(toBigEndian(ieee, 8));
+	}
+	public static byte[] IEEEDoubleToIbmHfpBytes(double d) {
+		long longVal = Double.doubleToRawLongBits(d);
+        return convertIEEEBytesToHFP(false, fromBigEndian(longVal, 8));
+	}
 
 	/**
      * Class to hold character-set details

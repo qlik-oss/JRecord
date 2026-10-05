@@ -44,11 +44,19 @@ package net.sf.JRecord.Types;
 import net.sf.JRecord.Common.Conversion;
 import net.sf.JRecord.Common.IFieldDetail;
 
+import net.sf.converters.CvtConversions;
+
 /**
  * Float / Double field Type
  *
  * <p>This class is the interface between the raw data in the file
  * and what is to be displayed on the screen for Float or Double fields
+ *
+ * <p>By default the raw data is interpreted as little-endian IEEE-754
+ * floating point. When {@link #setIbmHfpFloatingPoint(boolean) IBM HFP mode}
+ * is enabled, the raw data is instead interpreted as big-endian IBM
+ * System/360 Hexadecimal Floating Point (HFP) and converted to/from IEEE
+ * using {@link CvtConversions}.
  *
  * @author Bruce Martin
  *
@@ -58,6 +66,32 @@ public class TypeFloat extends TypeNum {
 
 	private static final int  LENGTH_OF_DOUBLE  =  8;
 	private static final int  LENGTH_OF_FLOAT   =  4;
+
+	/**
+	 * Whether float/double fields are stored as IBM System/360 Hexadecimal
+	 * Floating Point (HFP) rather than IEEE-754. This is a global interpretation
+	 * choice for a conversion run and is configured through the
+	 * {@code ICobolJsonConversion} interface.
+	 */
+	private static volatile boolean ibmHfpFloatingPoint = false;
+
+	/**
+	 * Enable or disable interpreting float/double fields as IBM System/360
+	 * Hexadecimal Floating Point (HFP) instead of IEEE-754.
+	 *
+	 * @param useIbmHfp whether to use IBM HFP floating point
+	 */
+	public static void setIbmHfpFloatingPoint(boolean useIbmHfp) {
+		ibmHfpFloatingPoint = useIbmHfp;
+	}
+
+	/**
+	 * @return whether float/double fields are interpreted as IBM System/360
+	 * Hexadecimal Floating Point (HFP)
+	 */
+	public static boolean isIbmHfpFloatingPoint() {
+		return ibmHfpFloatingPoint;
+	}
 
 
     /**
@@ -80,6 +114,10 @@ public class TypeFloat extends TypeNum {
 
          int fldLength = field.getLen();
          int pos = position - 1;
+
+         if (ibmHfpFloatingPoint) {
+             return "" + getIbmHfpField(record, pos, fldLength);
+         }
 
          if (fldLength == LENGTH_OF_FLOAT) {
         	 val = Float.toString(Float.intBitsToFloat(Conversion.getLittleEndianBigInt(record, pos, pos + fldLength).intValue()));
@@ -109,6 +147,11 @@ public class TypeFloat extends TypeNum {
         int pos = position - 1;
         double doubleVal  = getBigDecimal(field, toNumberString(value)).doubleValue();
 
+        if (ibmHfpFloatingPoint) {
+            setIbmHfpField(record, pos, len, doubleVal);
+            return record;
+        }
+
 	    if (len == LENGTH_OF_FLOAT) {
 	        long l = Float.floatToRawIntBits((float) doubleVal);
 	        Conversion.setLongLow2High(record, pos, len, l, true);
@@ -119,4 +162,41 @@ public class TypeFloat extends TypeNum {
 
 	    return record;
     }
+
+    /**
+     * Read an IBM System/360 HFP field (big-endian) from the record and return
+     * its value as a String, converting via {@link CvtConversions}.
+     */
+    private String getIbmHfpField(byte[] record, int pos, int fldLength) {
+        if (fldLength == LENGTH_OF_FLOAT) {
+            byte[] ibm = new byte[LENGTH_OF_FLOAT];
+            System.arraycopy(record, pos, ibm, 0, LENGTH_OF_FLOAT);
+            byte[] ieee = Conversion.convertHFPBytesToIEEE(true, ibm);
+            return Float.toString(Float.intBitsToFloat((int) Conversion.toBigEndian(ieee, LENGTH_OF_FLOAT)));
+        } else if (fldLength == LENGTH_OF_DOUBLE) {
+            byte[] ibm = new byte[LENGTH_OF_DOUBLE];
+            System.arraycopy(record, pos, ibm, 0, LENGTH_OF_DOUBLE);
+            byte[] ieee = Conversion.convertHFPBytesToIEEE(false, ibm);
+            return Double.toString(Double.longBitsToDouble(Conversion.toBigEndian(ieee, LENGTH_OF_DOUBLE)));
+        }
+        return "";
+    }
+
+    /**
+     * Convert a double value to an IBM System/360 HFP field (big-endian) and
+     * write it into the record, converting via {@link CvtConversions}.
+     */
+    private void setIbmHfpField(byte[] record, int pos, int len, double doubleVal) {
+        if (len == LENGTH_OF_FLOAT) {
+            byte[] ieee = Conversion.fromBigEndian(Float.floatToRawIntBits((float) doubleVal) & 0xFFFFFFFFL, LENGTH_OF_FLOAT);
+            byte[] ibm = Conversion.convertIEEEBytesToHFP(true, ieee);
+            System.arraycopy(ibm, 0, record, pos, LENGTH_OF_FLOAT);
+        } else if (len == LENGTH_OF_DOUBLE) {
+            byte[] ieee = Conversion.fromBigEndian(Double.doubleToRawLongBits(doubleVal), LENGTH_OF_DOUBLE);
+            byte[] ibm = Conversion.convertIEEEBytesToHFP(false, ieee);
+            System.arraycopy(ibm, 0, record, pos, LENGTH_OF_DOUBLE);
+        }
+    }
+
+
 }
