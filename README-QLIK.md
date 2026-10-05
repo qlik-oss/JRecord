@@ -1,7 +1,8 @@
 # Qlik changes to third-party sources
 
 ## JRecord 0.93.4
-Upstream: https://github.com/bmTas/JRecord
+- Upstream: https://github.com/bmTas/JRecord
+- Qlik branch: `QLIK-1.0.0`
 
 ### Summary of changes
 - HFP convertors: Added converters between ieee 754 and IBM's Hex floating points
