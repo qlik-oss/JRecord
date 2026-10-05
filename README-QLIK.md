@@ -1,15 +1,5 @@
 # Qlik changes to third-party sources
 
-## cb2xml 1.01.08
-Upstream: https://github.com/bmTas/cb2xml
-
-### Summary of changes
-- TODO: high-level highlight 1
-
-### Modified files
-- `src/.../SomeFile.java` - TODO: what changed and why
-### Added files
-
 ## JRecord 0.93.4
 Upstream: https://github.com/bmTas/JRecord
 
